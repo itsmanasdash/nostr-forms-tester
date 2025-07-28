@@ -1,0 +1,26 @@
+{
+  "name": "nostr-forms-tester",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "tsx run-tests.ts",
+    "build": "tsc",
+    "dev": "tsx --watch run-tests.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Comprehensive behavioral tests for Nostr Forms application",
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/node": "^20.0.0",
+    "playwright": "^1.54.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "wait-on": "^8.0.4"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
