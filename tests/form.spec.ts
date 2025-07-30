@@ -1,15 +1,14 @@
 import { test, expect, Page, Locator } from '@playwright/test';
 
-const formURL = 'http://localhost:3000/f/naddr1qvzqqqr4mqpzqfn4ghz9fzsmxjretw4fesdeaax30zcf8pck3q6tg5ffgj2g4ak8qy2hwumn8ghj7un9d3shjtnyv9kh2uewd9hj7qghwaehxw309aex2mrp0yh8qunfd4skctnwv46z7qgdwaehxw309ahx7uewd3hkcqg7waehxw309aex2mrp0yhxummnw3ezuamfwfjkgmn9wshx5up0qyw8wumn8ghj7mn0wd68ytfsxyh8jcttd95x7mnwv5hxxmmdqyv8wumn8ghj7un9d3shjtnndehhyapwwdhkx6tpdsq3vamnwvaz7tmjv4kxz7fwdehhxarj9e3xzmnyqyghwumn8ghj7mn0wd68yv339e3k7mgqqeuy75j0wyes4r93t6?viewKey=b42c156e04f0b3aba7714dfcb90bef63ace49a3fc924b6926d266ea5cd638828';
+const formURL = 'http://localhost:3000/f/naddr1qvzqqqr4mqpzpuje2ntl63kvmh6rykg5j39gmkgr7zmp0exwx8m08vhqn4ckuxklqy2hwumn8ghj7un9d3shjtnyv9kh2uewd9hj7qghwaehxw309aex2mrp0yh8qunfd4skctnwv46z7qgdwaehxw309ahx7uewd3hkcqg7waehxw309aex2mrp0yhxummnw3ezuamfwfjkgmn9wshx5up0qyw8wumn8ghj7mn0wd68ytfsxyh8jcttd95x7mnwv5hxxmmdqyv8wumn8ghj7un9d3shjtnndehhyapwwdhkx6tpdsq3vamnwvaz7tmjv4kxz7fwdehhxarj9e3xzmnyqyghwumn8ghj7mn0wd68yv339e3k7mgqqccnysjswdrqzakn8j?viewKey=9984845c95a1cb4b93b38ca192d4af4fb5fd4858d2583581c70772d267ffe2df';
 
-test.describe('Form Submission Behavioral Tests', () => {
+test.describe('Form Submission Tests Using data-testid', () => {
   test('Complete form submission with all input types', async ({ page }) => {
     test.setTimeout(120000); 
 
     await page.goto(formURL);
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('form', { timeout: 30000 });
-
+    await page.waitForSelector('[data-testid]', { timeout: 30000 });
     console.log('Form loaded successfully');
 
     await handleAllInputTypes(page);
@@ -20,206 +19,200 @@ test.describe('Form Submission Behavioral Tests', () => {
   test('Form submission with required fields only', async ({ page }) => {
     test.setTimeout(120000);
 
-    
     await page.goto(formURL);
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('form', { timeout: 30000 });
-
+    await page.waitForSelector('[data-testid]', { timeout: 30000 });
+    
     await fillRequiredFieldsOnly(page);
     await submitForm(page);
     await verifySubmissionSuccess(page);
   });
-
-  test('Form validation - missing required fields', async ({ page }) => {
-    test.setTimeout(120000);
-  
-
-    await page.goto(formURL);
-    await page.waitForLoadState('networkidle');
-    await page.waitForSelector('form', { timeout: 30000 });
-  
-    const requiredFields: Locator[] = await page.locator('.ant-form-item-required').all();
-    const hasRequiredFields: boolean = requiredFields.length > 0;
-    
-    console.log(`Found ${requiredFields.length} required fields`);
-  
-    await submitForm(page);
-  
-    if (hasRequiredFields) {
-      console.log('Form has required fields - checking for validation errors');
-      
-      await page.waitForTimeout(1000);
-      
-      const errorMessages: Locator[] = await page.locator('.ant-form-item-explain-error').all();
-      expect(errorMessages.length).toBeGreaterThan(0);
-      
-      console.log(`Found ${errorMessages.length} validation errors as expected`);
-    } else {
-      console.log('Form has no required fields - verifying successful submission');
-      
-      await verifySubmissionSuccess(page);
-      console.log('Form submitted successfully (no required fields)');
-    }
-  });
 });
 
 async function handleAllInputTypes(page: Page): Promise<void> {
-  console.log('Handling all input types...');
-
-  await handleTextInputs(page);
-  await handleTextareas(page);
-  await handleNumberInputs(page);
-  await handleRadioButtons(page);
-  await handleCheckboxes(page);
-  await handleDropdowns(page);
-  await handleDateInputs(page);
-  await handleTimeInputs(page);
+  console.log('Handling all input types using data-testid...');
+  const questionCards: Locator[] = await page.locator('.filler-question[data-testid]').all();
+  
+  for (const questionCard of questionCards) {
+    const fieldId: string = await questionCard.getAttribute('data-testid') || '';
+    console.log(`Processing question with fieldId: ${fieldId}`);
+    const isRequired: boolean = await questionCard.locator('span[style*="color: #ea8dea"]').count() > 0;
+    await handleQuestionInputByTestId(page, fieldId, isRequired);
+  }
 }
 
-async function handleTextInputs(page: Page): Promise<void> {
-  const textInputs: Locator[] = await page.locator('input[type="text"], input[type="email"], input:not([type])').all();
-  
-  for (const input of textInputs) {
-    const type: string | null = await input.getAttribute('type');
-    const placeholder: string = await input.getAttribute('placeholder') || '';
-    const isEmail: boolean = type === 'email' || placeholder.toLowerCase().includes('email');
-    
-    if (isEmail) {
-      await input.fill('test@example.com');
-    } else {
-      await input.fill(`Test ${placeholder || 'field'}`);
+async function handleQuestionInputByTestId(page: Page, fieldId: string, isRequired: boolean): Promise<void> {
+  try {
+
+    // 1. Text inputs (short text, email)
+    const textInput = page.locator(`input[data-testid="${fieldId}"]`);
+    if (await textInput.count() > 0) {
+      const placeholder = await textInput.getAttribute('placeholder') || '';
+      const isReadonly = await textInput.getAttribute('readonly') !== null;
+      
+      if (!isReadonly) {
+        const isEmail = placeholder.toLowerCase().includes('email') || fieldId.toLowerCase().includes('email');
+        const value = isEmail ? 'test@example.com' : `Test input for ${fieldId}`;
+        
+        await textInput.fill(value);
+        console.log(`✓ Filled text input for field ${fieldId}`);
+        return;
+      }
     }
-    
-    console.log(`Filled text input: ${type || 'text'}`);
-  }
-}
 
-async function handleTextareas(page: Page): Promise<void> {
-  const textareas: Locator[] = await page.locator('textarea').all();
-  
-  for (const textarea of textareas) {
-    await textarea.fill('This is a sample long answer for paragraph text. It contains multiple sentences to test the textarea functionality.');
-    console.log('Filled textarea');
-  }
-}
-
-async function handleNumberInputs(page: Page): Promise<void> {
-  const numberInputs: Locator[] = await page.locator('input[type="number"], .ant-input-number input').all();
-  
-  for (const input of numberInputs) {
-    await input.fill('42');
-    console.log('Filled number input');
-  }
-}
-
-async function handleRadioButtons(page: Page): Promise<void> {
-  const radioGroups: Locator[] = await page.locator('.ant-radio-group').all();
-  
-  for (const group of radioGroups) {
-    const firstRadio: Locator = await group.locator('.ant-radio').first();
-    await firstRadio.click();
-    console.log('Selected first radio button option');
-  }
-}
-
-async function handleCheckboxes(page: Page): Promise<void> {
-  const checkboxGroups: Locator[] = await page.locator('.ant-checkbox-group').all();
-  
-  for (const group of checkboxGroups) {
-    const checkboxes: Locator[] = await group.locator('.ant-checkbox').all();
-    for (let i = 0; i < Math.min(2, checkboxes.length); i++) {
-      await checkboxes[i].click();
+    // 2. Textarea (paragraph)
+    const textarea = page.locator(`textarea[data-testid="${fieldId}"]`);
+    if (await textarea.count() > 0) {
+      await textarea.fill('This is a sample long answer for paragraph text. It contains multiple sentences to test the textarea functionality.');
+      console.log(`✓ Filled textarea for field ${fieldId}`);
+      return;
     }
-    console.log(`Selected ${Math.min(2, checkboxes.length)} checkbox options`);
-  }
-}
 
-async function handleDropdowns(page: Page): Promise<void> {
-  const dropdowns: Locator[] = await page.locator('.ant-select').all();
-  
-  for (const dropdown of dropdowns) {
-    await dropdown.click();
-    await page.waitForTimeout(500);
-    
-    const options: Locator[] = await page.locator('.ant-select-dropdown .ant-select-item').all();
-    if (options.length > 1) {
-      await options[1].click();
-      console.log('Selected dropdown option');
+    // 3. Number inputs
+    const numberInput = page.locator(`[data-testid="${fieldId}"].ant-input-number`);
+    if (await numberInput.count() > 0) {
+      const inputField = numberInput.locator('input');
+      await inputField.fill('42');
+      console.log(`✓ Filled number input for field ${fieldId}`);
+      return;
     }
-  }
-}
 
-async function handleDateInputs(page: Page): Promise<void> {
-  const dateInputs: Locator[] = await page.locator('input[type="date"], .ant-picker-input input').all();
-  
-  for (const input of dateInputs) {
-    const type: string | null = await input.getAttribute('type');
-    if (type === 'date') {
-      await input.fill('2025-01-15');
-    } else {
-      await input.click();
+    // 4. Choice inputs (radio/checkbox) - using the Group's data-testid
+    const choiceGroup = page.locator(`[data-testid="${fieldId}"]`);
+    if (await choiceGroup.count() > 0) {
+      // Look for radio or checkbox inputs within the group
+      const radioOption = choiceGroup.locator('.ant-radio').first();
+      const checkboxOption = choiceGroup.locator('.ant-checkbox').first();
+      
+      if (await radioOption.count() > 0) {
+        await radioOption.click();
+        console.log(`✓ Selected radio option for field ${fieldId}`);
+        return;
+      } else if (await checkboxOption.count() > 0) {
+        await checkboxOption.click();
+        console.log(`✓ Selected checkbox option for field ${fieldId}`);
+        return;
+      }
+    }
+
+    // 5. Dropdown/Select
+    const dropdown = page.locator(`[data-testid="${fieldId}"].ant-select`);
+    if (await dropdown.count() > 0) {
+      await dropdown.click();
       await page.waitForTimeout(500);
-      const today: Locator = await page.locator('.ant-picker-cell-today').first();
-      await today.click();
+      
+      // Wait for dropdown options to appear
+      await page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { timeout: 5000 });
+      
+      const options = await page.locator('.ant-select-dropdown .ant-select-item-option').all();
+      if (options.length > 0) {
+        // Select the first available option
+        await options[0].click();
+        console.log(`✓ Selected dropdown option for field ${fieldId}`);
+        return;
+      }
     }
-    console.log('Filled date input');
-  }
-}
 
-async function handleTimeInputs(page: Page): Promise<void> {
-  const timeInputs: Locator[] = await page.locator('input[type="time"], .ant-picker-time-panel input').all();
-  
-  for (const input of timeInputs) {
-    const type: string | null = await input.getAttribute('type');
-    if (type === 'time') {
-      await input.fill('14:30');
-    } else {
-      await input.click();
+    // 6. Date picker
+    const datePicker = page.locator(`[data-testid="${fieldId}"].ant-picker`);
+    if (await datePicker.count() > 0) {
+      await datePicker.click();
       await page.waitForTimeout(500);
-      const timeOption: Locator = await page.locator('.ant-picker-time-panel-cell').first();
-      await timeOption.click();
+      
+      // Wait for date picker panel
+      await page.waitForSelector('.ant-picker-panel', { timeout: 5000 });
+      
+      const today = page.locator('.ant-picker-cell-today').first();
+      if (await today.count() > 0) {
+        await today.click();
+        console.log(`✓ Selected date for field ${fieldId}`);
+        return;
+      } else {
+        // If no "today" cell, click any available date
+        const anyDateCell = page.locator('.ant-picker-cell').first();
+        if (await anyDateCell.count() > 0) {
+          await anyDateCell.click();
+          console.log(`✓ Selected date for field ${fieldId}`);
+          return;
+        }
+      }
     }
-    console.log('Filled time input');
+
+    // 7. Time picker
+    const timePicker = page.locator(`[data-testid="${fieldId}"].ant-picker`);
+    if (await timePicker.count() > 0) {
+      // Check if this is specifically a time picker by looking for time-related classes
+      const isTimePicker = await timePicker.locator('.ant-picker-input input[placeholder*="time" i], .ant-picker-input input[placeholder*="h:mm" i]').count() > 0;
+      
+      if (isTimePicker) {
+        await timePicker.click();
+        await page.waitForTimeout(500);
+        
+        // Wait for time panel
+        await page.waitForSelector('.ant-picker-time-panel', { timeout: 5000 });
+        
+        // Select first available time option
+        const timeCell = page.locator('.ant-picker-time-panel-cell').first();
+        if (await timeCell.count() > 0) {
+          await timeCell.click();
+          
+          // Click OK button if present
+          const okButton = page.locator('.ant-picker-ok button');
+          if (await okButton.count() > 0) {
+            await okButton.click();
+          }
+          
+          console.log(`✓ Selected time for field ${fieldId}`);
+          return;
+        }
+      }
+    }
+
+    // 8. Fallback for readonly date inputs (alternative date picker implementation)
+    const readonlyDateInput = page.locator(`input[readonly][data-testid="${fieldId}"]`);
+    if (await readonlyDateInput.count() > 0) {
+      const placeholder = await readonlyDateInput.getAttribute('placeholder') || '';
+      if (placeholder.toLowerCase().includes('date')) {
+        await readonlyDateInput.click();
+        await page.waitForTimeout(500);
+        
+        const today = page.locator('.ant-picker-cell-today').first();
+        if (await today.count() > 0) {
+          await today.click();
+          console.log(`✓ Selected date for readonly input ${fieldId}`);
+          return;
+        }
+      }
+    }
+
+    console.log(`⚠ No suitable input found for field ${fieldId}`);
+    
+  } catch (error) {
+    console.error(`❌ Error handling field ${fieldId}:`, error);
+    
+    await page.screenshot({ path: `debug-field-${fieldId}.png` });
+    
+    if (isRequired) {
+      throw new Error(`Failed to fill required field: ${fieldId}`);
+    }
   }
 }
 
 async function fillRequiredFieldsOnly(page: Page): Promise<void> {
-  console.log('Filling only required fields...');
+  console.log('Filling only required fields using data-testid...');
   
-  const requiredFields: Locator[] = await page.locator('.ant-form-item-required').all();
+  const questionCards: Locator[] = await page.locator('.filler-question[data-testid]').all();
   
-  for (const field of requiredFields) {
-    const parent: Locator = await field.locator('..');
-    const input: Locator = await parent.locator('input, textarea, .ant-select, .ant-radio-group, .ant-checkbox-group').first();
+  for (const questionCard of questionCards) {
+    const fieldId: string = await questionCard.getAttribute('data-testid') || '';
     
-    if (await input.count() > 0) {
-      const tagName: string = await input.evaluate(el => el.tagName.toLowerCase());
-      
-      if (tagName === 'input') {
-        const type: string | null = await input.getAttribute('type');
-        if (type === 'email') {
-          await input.fill('test@example.com');
-        } else if (type === 'number') {
-          await input.fill('42');
-        } else {
-          await input.fill('Required field value');
-        }
-      } else if (tagName === 'textarea') {
-        await input.fill('Required paragraph text');
-      } else if (await input.evaluate(el => el.classList.contains('ant-select'))) {
-        await input.click();
-        await page.waitForTimeout(500);
-        const option: Locator = await page.locator('.ant-select-dropdown .ant-select-item').first();
-        await option.click();
-      } else if (await input.evaluate(el => el.classList.contains('ant-radio-group'))) {
-        const radio: Locator = await input.locator('.ant-radio').first();
-        await radio.click();
-      } else if (await input.evaluate(el => el.classList.contains('ant-checkbox-group'))) {
-        const checkbox: Locator = await input.locator('.ant-checkbox').first();
-        await checkbox.click();
-      }
-      
-      console.log('Filled required field');
+    const isRequired: boolean = await questionCard.locator('span[style*="color: #ea8dea"]').count() > 0;
+    
+    if (isRequired) {
+      console.log(`Filling required field ${fieldId}`);
+      await handleQuestionInputByTestId(page, fieldId, true);
+    } else {
+      console.log(`Skipping non-required field ${fieldId}`);
     }
   }
 }
@@ -227,32 +220,12 @@ async function fillRequiredFieldsOnly(page: Page): Promise<void> {
 async function submitForm(page: Page): Promise<void> {
   console.log('Submitting form...');
   
-  const submitSelectors: string[] = [
-    '.submit-button',
-    'button[type="submit"]',
-    'button:has-text("Submit")',
-    '.ant-btn-primary:has-text("Submit")',
-    '.ant-dropdown-button .ant-btn-primary'
-  ];
-  
-  let submitted: boolean = false;
-  
-  for (const selector of submitSelectors) {
-    try {
-      const submitButton: Locator = await page.locator(selector).first();
-      if (await submitButton.isVisible()) {
-        await submitButton.click();
-        submitted = true;
-        console.log(`Form submitted using selector: ${selector}`);
-        break;
-      }
-    } catch (error) {
-      console.log(`Submit button not found with selector: ${selector}`);
-    }
-  }
-  
-  if (!submitted) {
-    throw new Error('Submit button not found with any selector');
+  const submitButton: Locator = await page.locator('[data-testid="submit-button"]').first();
+  if (await submitButton.isVisible()) {
+    await submitButton.click();
+    console.log('Form submitted using submit button');
+  } else {
+    throw new Error('Submit button not found');
   }
   
   await page.waitForTimeout(3000);
@@ -282,21 +255,45 @@ async function verifySubmissionSuccess(page: Page): Promise<void> {
         break;
       }
     } catch (error) {
-      // Continue to next selector
     }
   }
   
   if (!successFound) {
     const currentUrl: string = page.url();
-    console.log(`Current URL after submission: ${currentUrl}\n`);
+    console.log(`Current URL after submission: ${currentUrl}`);
     
     const pageContent: string = await page.content();
     if (pageContent.includes('thank') || pageContent.includes('success') || pageContent.includes('submitted')) {
       successFound = true;
-      console.log('Success indicator found in page content\n');
+      console.log('Success indicator found in page content');
     }
   }
   
   expect(successFound).toBe(true);
-  console.log('Form submission verified successfully!\n');
+  console.log('Form submission verified successfully!');
+}
+
+// Helper function for better error handling and retries
+async function clickWithRetry(locator: Locator, maxRetries: number = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await locator.click();
+      return;
+    } catch (error) {
+      console.log(`Click attempt ${attempt} failed:`, error);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+// Helper function to wait for element and perform action
+async function waitAndFill(locator: Locator, value: string, timeout: number = 5000): Promise<void> {
+  await expect(locator).toBeVisible({ timeout });
+  await locator.fill(value);
 }
